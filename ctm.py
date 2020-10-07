@@ -3,8 +3,8 @@
 import ssl
 import socket
 import os
-import httplib
-import base64
+import http.client
+from base64 import b64encode
 import json
 import urllib
 import uuid
@@ -19,20 +19,21 @@ class Client:
     """
       Create a CallTrackingMetrics REST Client
     """
-    self.account = account
-    self.auth    = base64.standard_b64encode('%s:%s' % (token, secret)), # get these from your CTM agency settings page
+    self.debug   = debug
+    self.account = int(account)
+    self.auth    = b64encode( ('%s:%s' % (token, secret)).encode('ascii') ).decode("ascii")
     self.host    = host
     self.base    = "/api/%s/" % version
     self.version = version
-    self.debug   = debug
+
     if self.debug:
-      print "%s %s" % (self.host, self.account)
+      print("%s %s" % (self.host, self.account))
 
   def set_account(self, account):
-    self.account = account
+    self.account = int(account)
 
   def _get_http_conn(self):
-    return httplib.HTTPSConnection(self.host)
+    return http.client.HTTPSConnection(self.host)
 
   def _request(self, method, path, data={}):
     path    = path.rstrip('/')
@@ -43,37 +44,37 @@ class Client:
               }
     conn    = self._get_http_conn()
     if self.debug: 
-      print "request: https://%s%s" % (self.host, url)
+      print("request: https://%s%s" % (self.host, url))
 
     if method == 'POST':
-      body = json.dumps(data)#urllib.urlencode(data,True)
+      body = json.dumps(data)
       if self.debug:
-        print body
+        print(body)
       conn.request("POST", url, body=body, headers=headers)
     elif method == 'GET':
-      conn.request("GET", url + "?" + urllib.urlencode(data,True), headers=headers)
+      conn.request("GET", url + "?" + urllib.parse.urlencode(data,True), headers=headers)
     elif method == 'DELETE':
-      conn.request("DELETE", url + "?" + urllib.urlencode(data,True), headers=headers)
+      conn.request("DELETE", url + "?" + urllib.parse.urlencode(data,True), headers=headers)
     elif method == 'UPLOAD':
       headers.pop('Content-Type', None)
       conn.request("PUT", url, body=data, headers=headers)
     elif method == 'PUT':
       data['_method'] = 'PUT'
-      conn.request("POST", url, body=urllib.urlencode(data,True), headers=headers)
+      conn.request("POST", url, body=urllib.parse.urlencode(data,True), headers=headers)
 
     r = conn.getresponse()
     if r.status == 200:
       try:
         response = json.load(r)
       except ValueError:
-        print "error parsing response"
+        print("error parsing response")
         response = r.read()
     else:
       response = r.read()
     return (r.status, response)
 
   def calls(self, options={}):
-    return self._request('GET', 'accounts/%d/calls' % self.account, options)
+    return self._request('POST', 'accounts/%d/calls/search.json' % self.account, options)
 
   def call(self, call_id):
     return self._request('GET', 'accounts/%d/calls/%d' % (self.account, call_id))
